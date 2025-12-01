@@ -89,7 +89,9 @@ def train_pipeline(
     
     # Save the best model if path is provided
     if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        save_dir = os.path.dirname(save_path)
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
         joblib.dump(search.best_estimator_, save_path)
         print(f"Best model saved to: {save_path}")
     
