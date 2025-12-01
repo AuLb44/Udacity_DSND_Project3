@@ -29,6 +29,8 @@ cd notebooks
 jupyter notebook 02_model_pipeline.ipynb
 ```
 
+> **Note:** The notebook `notebooks/02_model_pipeline.ipynb` has been pre-executed with all cell outputs saved. You can view the results directly or re-run the cells yourself.
+
 The notebook uses the included sample dataset (`data/raw/reviews_sample.csv`) and will:
 - Load and preprocess the data
 - Build the feature engineering pipeline
