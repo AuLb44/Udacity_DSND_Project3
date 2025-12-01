@@ -1,6 +1,11 @@
 # Personalized files
 .DS_Store
 
+# Model files (generated during training)
+models/*.joblib
+models/*.pkl
+!models/.gitkeep
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
