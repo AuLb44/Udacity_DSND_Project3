@@ -130,3 +130,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Model files (trained models)
+models/*.joblib
+models/*.pkl
+models/*.pickle
+!models/.gitkeep
+
+# Data files
+data/raw/*.csv
+!data/raw/.gitkeep
