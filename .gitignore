@@ -1,8 +1,8 @@
 # Personalized files
 .DS_Store
 
-# Model files (generated during training)
-models/*.joblib
+# Model files (generated during training - these will be regenerated)
+# Note: model_v1.joblib is explicitly included via negation rules below
 models/*.pkl
 !models/.gitkeep
 
@@ -141,7 +141,9 @@ models/*.joblib
 models/*.pkl
 models/*.pickle
 !models/.gitkeep
+!models/model_v1.joblib
 
 # Data files
 data/raw/*.csv
 !data/raw/.gitkeep
+!data/raw/reviews_sample.csv
