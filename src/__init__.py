@@ -1,11 +1,17 @@
-# src package for Udacity DSND Project 3 - Fashion Forward Forecasting
-"""
-This package contains modules for data processing, feature engineering,
-and model training for the Fashion Forward Forecasting project.
-"""
+"""Fashion Forward Forecasting - ML Pipeline Package."""
 
-from . import data_processing
-from . import features
-from . import model
+from .data_processing import load_data, split_data, normalize_text_column, create_sample_data
+from .features import TextCleaner, ExtraTextFeatures, build_preprocessor
+from .model import build_model_pipeline, train_pipeline
 
-__all__ = ['data_processing', 'features', 'model']
+__all__ = [
+    'load_data',
+    'split_data',
+    'normalize_text_column',
+    'create_sample_data',
+    'TextCleaner',
+    'ExtraTextFeatures',
+    'build_preprocessor',
+    'build_model_pipeline',
+    'train_pipeline',
+]

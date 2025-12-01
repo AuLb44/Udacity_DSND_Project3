@@ -1,181 +1,98 @@
-"""
-Model building and training module.
-"""
+"""Model training utilities for Fashion Forward Forecasting."""
 
 import os
 import joblib
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import RandomizedSearchCV
-import numpy as np
-
-from .features import build_preprocessor
-from .data_processing import get_column_types
+from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
 
 
-def build_pipeline(
-    numeric_features: list,
-    categorical_features: list,
-    text_features: list,
-    max_tfidf_features: int = 5000,
-    random_state: int = 27
-):
+def build_model_pipeline(preprocessor) -> Pipeline:
+    """Build the model pipeline with preprocessor and classifier.
+    
+    Args:
+        preprocessor: A fitted or unfitted ColumnTransformer preprocessor.
+        
+    Returns:
+        sklearn Pipeline with preprocessor and LogisticRegression classifier.
     """
-    Build a complete sklearn Pipeline with preprocessing and classifier.
-
-    Parameters
-    ----------
-    numeric_features : list
-        List of numeric column names.
-    categorical_features : list
-        List of categorical column names.
-    text_features : list
-        List of text column names.
-    max_tfidf_features : int
-        Maximum number of TF-IDF features.
-    random_state : int
-        Random seed for reproducibility.
-
-    Returns
-    -------
-    Pipeline
-        Complete sklearn Pipeline.
-    """
-    preprocessor = build_preprocessor(
-        numeric_features=numeric_features,
-        categorical_features=categorical_features,
-        text_features=text_features,
-        max_tfidf_features=max_tfidf_features
-    )
-
-    pipeline = Pipeline(steps=[
-        ('preprocessor', preprocessor),
-        ('classifier', LogisticRegression(
-            random_state=random_state,
-            max_iter=1000,
-            solver='lbfgs'
-        ))
+    pipeline = Pipeline([
+        ('preproc', preprocessor),
+        ('clf', LogisticRegression(max_iter=2000, random_state=42))
     ])
-
+    
     return pipeline
-
-
-def get_param_grid():
-    """
-    Get parameter grid for hyperparameter search.
-
-    Returns
-    -------
-    dict
-        Parameter grid for RandomizedSearchCV.
-    """
-    return {
-        'preprocessor__text__tfidf__max_features': [1000, 3000, 5000],
-        'preprocessor__text__tfidf__ngram_range': [(1, 1), (1, 2)],
-        'classifier__C': np.logspace(-3, 3, 7),
-        'classifier__penalty': ['l2'],
-        'classifier__class_weight': [None, 'balanced']
-    }
 
 
 def train_pipeline(
     pipeline: Pipeline,
     X_train,
     y_train,
-    param_grid: dict = None,
-    n_iter: int = 10,
-    cv: int = 3,
+    param_distributions: dict = None,
+    n_iter: int = 50,
+    cv: int = 5,
     scoring: str = 'f1',
-    random_state: int = 27,
-    n_jobs: int = -1,
+    random_state: int = 42,
+    save_path: str = 'models/model_v1.joblib',
     verbose: int = 1
 ):
-    """
-    Train pipeline using RandomizedSearchCV.
-
-    Parameters
-    ----------
-    pipeline : Pipeline
-        Sklearn Pipeline to train.
-    X_train : pd.DataFrame
-        Training features.
-    y_train : pd.Series
-        Training target.
-    param_grid : dict, optional
-        Parameter grid for search. If None, uses default.
-    n_iter : int
-        Number of parameter settings sampled.
-    cv : int
-        Number of cross-validation folds.
-    scoring : str
-        Scoring metric.
-    random_state : int
-        Random seed for reproducibility.
-    n_jobs : int
-        Number of parallel jobs.
-    verbose : int
-        Verbosity level.
-
-    Returns
-    -------
-    RandomizedSearchCV
+    """Train the pipeline using RandomizedSearchCV for hyperparameter tuning.
+    
+    Uses StratifiedKFold cross-validation to avoid data leakage and ensure
+    proper evaluation across class distributions.
+    
+    Args:
+        pipeline: sklearn Pipeline to train.
+        X_train: Training features.
+        y_train: Training labels.
+        param_distributions: Dict of hyperparameters to search. If None, uses defaults.
+        n_iter: Number of parameter settings to sample.
+        cv: Number of cross-validation folds.
+        scoring: Scoring metric for evaluation.
+        random_state: Random seed for reproducibility.
+        save_path: Path to save the best model. Set to None to skip saving.
+        verbose: Verbosity level for RandomizedSearchCV.
+        
+    Returns:
         Fitted RandomizedSearchCV object.
     """
-    if param_grid is None:
-        param_grid = get_param_grid()
-
+    # Default parameter distributions for hyperparameter tuning
+    if param_distributions is None:
+        param_distributions = {
+            # TF-IDF parameters
+            'preproc__txt__tfidf__max_features': [2000, 5000, 10000],
+            'preproc__txt__tfidf__ngram_range': [(1, 1), (1, 2)],
+            # Classifier parameters
+            'clf__C': [0.01, 0.1, 1, 10],
+            'clf__penalty': ['l2'],
+            'clf__solver': ['lbfgs', 'saga'],
+        }
+    
+    # Use StratifiedKFold for proper cross-validation
+    cv_splitter = StratifiedKFold(n_splits=cv, shuffle=True, random_state=random_state)
+    
+    # Create RandomizedSearchCV
     search = RandomizedSearchCV(
-        estimator=pipeline,
-        param_distributions=param_grid,
+        pipeline,
+        param_distributions=param_distributions,
         n_iter=n_iter,
-        cv=cv,
+        cv=cv_splitter,
         scoring=scoring,
         random_state=random_state,
-        n_jobs=n_jobs,
+        n_jobs=-1,
         verbose=verbose,
         return_train_score=True
     )
-
+    
+    # Fit the search
     search.fit(X_train, y_train)
-
+    
+    # Save the best model if path is provided
+    if save_path:
+        save_dir = os.path.dirname(save_path)
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
+        joblib.dump(search.best_estimator_, save_path)
+        print(f"Best model saved to: {save_path}")
+    
     return search
-
-
-def save_pipeline(pipeline, filepath: str = 'models/model_v1.joblib'):
-    """
-    Save a trained pipeline to disk.
-
-    Parameters
-    ----------
-    pipeline : Pipeline or RandomizedSearchCV
-        Trained pipeline or search object to save.
-    filepath : str
-        Path to save the pipeline.
-    """
-    # Create directory if it doesn't exist
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-
-    # Save the best estimator if it's a search object
-    if hasattr(pipeline, 'best_estimator_'):
-        joblib.dump(pipeline.best_estimator_, filepath)
-    else:
-        joblib.dump(pipeline, filepath)
-
-    print(f"Pipeline saved to {filepath}")
-
-
-def load_pipeline(filepath: str = 'models/model_v1.joblib'):
-    """
-    Load a trained pipeline from disk.
-
-    Parameters
-    ----------
-    filepath : str
-        Path to the saved pipeline.
-
-    Returns
-    -------
-    Pipeline
-        Loaded pipeline.
-    """
-    return joblib.load(filepath)
